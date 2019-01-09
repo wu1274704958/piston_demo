@@ -4,7 +4,7 @@ extern crate vecmath;
 
 use piston_window::draw_state::Blend;
 use piston_window::*;
-use piston_window::Transformed;
+use piston_window::{ Transformed,AdvancedWindow,Event};
 use piston_window::math::{ Matrix2d,Vec2d,rotate_radians,translate,transform_vec,add,sub,cast,dot};
 use std::f64::consts::PI;
 
@@ -17,8 +17,8 @@ fn main() {
     let tween_vec = {
         let curve: Bez3o<f64> = Bez3o::new(
             Point2d::new(0.0    ,0.0),
-            Point2d::new(0.06   ,0.74),
-            Point2d::new(0.32   ,1.00),
+            Point2d::new(0.14   ,0.21),
+            Point2d::new(0.47   ,0.97),
             Point2d::new(1.0    ,1.0)
         );
         let curve_chain: BezChain<f64, Bez3o<f64>, Vec<Point2d<f64>>> = BezChain::from_container(vec![
@@ -29,9 +29,9 @@ fn main() {
         let mut res = vec![];
         for curve in curve_chain.iter() {
             let mut t = 0.0;
-            let zl = 1.0 / 40.0;
+            let zl = 1.0 / 80.0;
 
-            for _i in 0..40{
+            for _i in 0..80{
                 res.push(curve.interp(t).unwrap());
                 t += zl;
             }
@@ -48,6 +48,8 @@ fn main() {
         .exit_on_esc(true)
         .samples(32)
         .vsync(true)
+        .decorated(false)
+        .resizable(false)
         .build()
         .unwrap();
 
@@ -73,8 +75,9 @@ fn main() {
     let base_logo = [-clip_w,-clip_h,clip_w * 2.0,clip_h * 2.0];
 
     let mut cur_i = 0usize;
+    let mut cur_i2 = 0usize;
     let mut scale_x = 0.0;
-    let mut scale_x_dir = 1.0;
+    let mut scale_x_dir = 1i32;
 
     let mut ds_c1 = DrawState::new_outside();
     ds_c1.stencil = Some(Stencil::Clip(1));
@@ -85,7 +88,7 @@ fn main() {
     ds_l1.stencil = Some(Stencil::Outside(1));
     let mut ds_l2 = DrawState::new_outside();
     ds_l2.stencil = Some(Stencil::Inside(2));
-
+    let mut mouseButtonDown = false;
 
     let PI2 = PI * 2.0;
     let mut f = true;
@@ -95,6 +98,11 @@ fn main() {
     while let Some(e) = window.next() {
         window.draw_2d(&e, |c:Context, g| {
             clear([0.8, 0.8, 0.8, 1.0], g);
+
+//            let ds_bg = DrawState::new_alpha();
+//
+//            Rectangle::new([0.0,0.0,0.0,0.0])
+//                .draw([0.0,0.0,150.0,150.0],&ds_bg,c.transform,g);
 
             let transform = c.transform.trans(3.0, 3.0);
 
@@ -164,24 +172,36 @@ fn main() {
                               l2_tf, g);
 
            // if angle >= PI2 { angle = 0.0; }else{ angle += 0.1; }
-            scale_x += scale_x_dir * 0.1;
-            if scale_x_dir > 0.0 && 1.0 - scale_x < 0.1{
-                scale_x_dir = 0.0 - scale_x_dir;
+
+            if scale_x_dir > 0 && cur_i2 >= tween_vec.len() - 1{
+                scale_x_dir = -1;
             }
 
-            if scale_x_dir < 0.0 && scale_x < 0.1{
-                scale_x_dir = 0.0 - scale_x_dir;
+            if scale_x_dir < 0 && cur_i2 == 0{
+                scale_x_dir = 1;
             }
+
+            cur_i2 += (scale_x_dir * 1) as usize;
+            scale_x = tween_vec[cur_i2].y;
+
             if cur_i >= tween_vec.len() { cur_i = 0; }
 
             angle =  PI * 2.0 * tween_vec[cur_i].y;
             angle2 =  PI * 2.0 * tween_vec[tween_vec.len() - 1 - cur_i].y;
 
             cur_i += 1;
-
-
-
         });
 
+        if let Event::Input(Input::Move(Motion::MouseRelative(x,y))) = e {
+
+            if mouseButtonDown { window.set_position( Position{x:x as i32,y:y as i32} ); }
+            println!("{} {} ", x,y);
+        }
+
+        if let Event::Input(Input::Button(ButtonArgs{button,..})) = e{
+            if let Button::Mouse(MouseButton::Left) = button{
+                mouseButtonDown = !mouseButtonDown;
+            }
+        }
     }
 }
