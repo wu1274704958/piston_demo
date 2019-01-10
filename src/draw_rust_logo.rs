@@ -1,16 +1,24 @@
 extern crate piston_window;
 extern crate find_folder;
 extern crate vecmath;
+extern crate glutin_window;
 
 use piston_window::draw_state::Blend;
 use piston_window::*;
-use piston_window::{ Transformed,AdvancedWindow,Event};
+use piston_window::{ Position,Texture,Flip,PistonWindow,Transformed,AdvancedWindow,Event,TextureSettings,ImageSize};
 use piston_window::math::{ Matrix2d,Vec2d,rotate_radians,translate,transform_vec,add,sub,cast,dot};
 use std::f64::consts::PI;
+use glutin_window::GlutinWindow;
+use glutin_window::WindowSettings;
 
 use nbez::{BezChain,Point2d,Bez3o,BezCurve};
 use piston_window::draw_state::Stencil;
 use vecmath::vec2_normalized;
+use glutin::{ Window};
+use glutin::dpi::LogicalPosition;
+
+const W:u16 = 150u16;
+const H:u16 = 150u16;
 
 fn main() {
 
@@ -29,9 +37,9 @@ fn main() {
         let mut res = vec![];
         for curve in curve_chain.iter() {
             let mut t = 0.0;
-            let zl = 1.0 / 80.0;
+            let zl = 1.0 / 40.0;
 
-            for _i in 0..80{
+            for _i in 0..40{
                 res.push(curve.interp(t).unwrap());
                 t += zl;
             }
@@ -41,15 +49,16 @@ fn main() {
         res
     };
 
-    let mut window: PistonWindow = WindowSettings::new(
+    let mut window: PistonWindow<GlutinWindow> = WindowSettings::new(
         "piston: draw_state",
-        [150, 150]
+        [W as f64,H as f64]
     )
         .exit_on_esc(true)
         .samples(32)
         .vsync(true)
         .decorated(false)
         .resizable(false)
+        .transparent(true)
         .build()
         .unwrap();
 
@@ -88,7 +97,12 @@ fn main() {
     ds_l1.stencil = Some(Stencil::Outside(1));
     let mut ds_l2 = DrawState::new_outside();
     ds_l2.stencil = Some(Stencil::Inside(2));
-    let mut mouseButtonDown = false;
+
+    let mut mouse_button_down = false;
+    let mut last_cursor_pos:Vec2d = [0.0,0.0];
+    let mut begin_cursor_pos:Vec2d = [W as f64,H as f64];
+    let mut now = LogicalPosition::new(0.0,0.0);
+    let mut lose_focus = false;
 
     let PI2 = PI * 2.0;
     let mut f = true;
@@ -97,7 +111,7 @@ fn main() {
 
     while let Some(e) = window.next() {
         window.draw_2d(&e, |c:Context, g| {
-            clear([0.8, 0.8, 0.8, 1.0], g);
+            clear([0.0, 0.0, 0.0, 0.0], g);
 
 //            let ds_bg = DrawState::new_alpha();
 //
@@ -192,16 +206,43 @@ fn main() {
             cur_i += 1;
         });
 
-        if let Event::Input(Input::Move(Motion::MouseRelative(x,y))) = e {
+        if let Event::Input(Input::Move(Motion::MouseCursor(x,y))) = e {
 
-            if mouseButtonDown { window.set_position( Position{x:x as i32,y:y as i32} ); }
-            println!("{} {} ", x,y);
+            if mouse_button_down {
+                let offset = sub([x,y],begin_cursor_pos);
+                let w:&glutin::GlWindow = &(window.window.window);
+                if offset[0].abs() >= 5.0 || offset[1].abs() >= 5.0
+                {
+                    //println!("{:?}, {:?} {:?}",now,offset,begin_cursor_pos);
+                    now = w.get_position().unwrap();
+                    w.set_position(LogicalPosition::new(now.x + offset[0],now.y + offset[1]));
+                }
+            }
+            last_cursor_pos[0] = x;
+            last_cursor_pos[1] = y;
         }
 
-        if let Event::Input(Input::Button(ButtonArgs{button,..})) = e{
+        if let Event::Input(Input::Button(ButtonArgs{button,state,..})) = e{
             if let Button::Mouse(MouseButton::Left) = button{
-                mouseButtonDown = !mouseButtonDown;
+                match state {
+                    ButtonState::Press => {
+                        mouse_button_down = true;
+                        if lose_focus{
+                            begin_cursor_pos = [ (W >> 1) as f64,(H >> 1) as f64 ];
+                            lose_focus = false;
+                        }else{
+                            begin_cursor_pos = last_cursor_pos;
+                        }
+                    },
+                    ButtonState::Release => {
+                        mouse_button_down = false;
+                    }
+                }
             }
+        }
+
+        if let Event::Input(Input::Focus(is_focus)) = e {
+            if !is_focus { lose_focus = true; }
         }
     }
 }

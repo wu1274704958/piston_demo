@@ -13,7 +13,12 @@ name = "draw_rust_logo"
 path = "src/draw_rust_logo.rs"
 
 [dependencies]
-piston_window = { version = "0.85.0",features = ["glutin"]}
+piston_window = { path="./piston_window-0.85.0",features = ["glutin"] }
 find_folder = "0.3.0"
 vecmath = "0.3.0"
 nbez = "0.1.0"
+glutin = "0.19"
+
+[dependencies.pistoncore-glutin_window]
+path = "./pistoncore-glutin_window-0.51.1"
+
