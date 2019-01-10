@@ -69,7 +69,8 @@ fn window_builder_from_settings(settings: &WindowSettings) -> glutin::WindowBuil
         .with_multitouch()
         .with_title(settings.get_title())
         .with_resizable(settings.get_resizable())
-        .with_transparency(transparent);
+        .with_transparency(transparent)
+        .with_always_on_top(settings.get_always_on_top());
 
     if settings.get_fullscreen() {
         let events_loop = glutin::EventsLoop::new();

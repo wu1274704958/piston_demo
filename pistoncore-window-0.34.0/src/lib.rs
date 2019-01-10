@@ -383,6 +383,7 @@ pub struct WindowSettings {
     decorated: bool,
     controllers: bool,
     transparent: bool,
+    always_on_top : bool,
 }
 
 impl WindowSettings {
@@ -409,7 +410,8 @@ impl WindowSettings {
             resizable: true,
             decorated: true,
             controllers: true,
-            transparent: false
+            transparent: false,
+            always_on_top : false
         }
     }
 
@@ -757,6 +759,21 @@ impl WindowSettings {
     /// Sets whether the background of the window should be transparent.
     pub fn transparent(mut self, value: bool) -> Self {
         self.set_transparent(value);
+        self
+    }
+
+    /// Gets whether the window should be always on top.
+    pub fn set_always_on_top(&mut self, value: bool) {
+        self.always_on_top = value;
+    }
+    /// Sets whether the window should be always on top.
+    pub fn get_always_on_top(&self) -> bool {
+        self.always_on_top
+    }
+
+    /// Sets whether the window should be always on top.
+    pub fn always_on_top(mut self, value: bool) -> Self {
+        self.set_always_on_top(value);
         self
     }
 }

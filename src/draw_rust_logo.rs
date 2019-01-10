@@ -5,7 +5,7 @@ extern crate glutin_window;
 
 use piston_window::draw_state::Blend;
 use piston_window::*;
-use piston_window::{ Position,Texture,Flip,PistonWindow,Transformed,AdvancedWindow,Event,TextureSettings,ImageSize};
+use piston_window::{ Position,Texture,Flip,PistonWindow,Transformed,AdvancedWindow,Event,TextureSettings,ImageSize,RenderArgs};
 use piston_window::math::{ Matrix2d,Vec2d,rotate_radians,translate,transform_vec,add,sub,cast,dot};
 use std::f64::consts::PI;
 use glutin_window::GlutinWindow;
@@ -16,17 +16,59 @@ use piston_window::draw_state::Stencil;
 use vecmath::vec2_normalized;
 use glutin::{ Window};
 use glutin::dpi::LogicalPosition;
+use std::env::args;
+
 
 const W:u16 = 150u16;
 const H:u16 = 150u16;
 
 fn main() {
+    let default_ctrl_ps:Vec<f64> = vec![0.54,0.06,0.46,1.0];
+    let mut ctrl_ps = vec![];
+
+    let mut ctrl_ps_handler= &default_ctrl_ps;
+
+    let mut aot = false; // always on top
+
+    let mut stage = 0;
+    args().for_each(|arg|{
+        if stage != 0 {
+            match stage {
+                1 => {
+                    let split_strs : Vec<&str> = arg.split(",").collect();
+                    ctrl_ps = split_strs.iter().filter_map(|it|{
+                        let mut s = it.to_string();
+                        if it.len() == 0 { return None; }
+                        if it.as_bytes()[0] == b'.'{
+                            s.insert_str(0,"0");
+                        }
+                        println!("{}",s);
+                        str::parse::<f64>(s.as_str()).ok()
+                    }).collect();
+                    let ptr = &ctrl_ps as *const _;
+                    ctrl_ps_handler = unsafe { &(*ptr) };
+                },
+                _ => {}
+            }
+            stage = 0;
+        }else{
+            match arg.as_str() {
+                "-o" => aot = true,
+                "-v" => stage = 1,
+                _ => {}
+            }
+        }
+    });
+
+    if ctrl_ps_handler.len() < 4{
+        ctrl_ps_handler = &default_ctrl_ps;
+    }
 
     let tween_vec = {
         let curve: Bez3o<f64> = Bez3o::new(
             Point2d::new(0.0    ,0.0),
-            Point2d::new(0.14   ,0.21),
-            Point2d::new(0.47   ,0.97),
+            Point2d::new(ctrl_ps_handler[0]   , ctrl_ps_handler[1]),
+            Point2d::new(ctrl_ps_handler[2]   , ctrl_ps_handler[3]),
             Point2d::new(1.0    ,1.0)
         );
         let curve_chain: BezChain<f64, Bez3o<f64>, Vec<Point2d<f64>>> = BezChain::from_container(vec![
@@ -37,9 +79,9 @@ fn main() {
         let mut res = vec![];
         for curve in curve_chain.iter() {
             let mut t = 0.0;
-            let zl = 1.0 / 40.0;
+            let zl = 1.0 / 60.0;
 
-            for _i in 0..40{
+            for _i in 0..60{
                 res.push(curve.interp(t).unwrap());
                 t += zl;
             }
@@ -59,6 +101,7 @@ fn main() {
         .decorated(false)
         .resizable(false)
         .transparent(true)
+        .always_on_top(aot)
         .build()
         .unwrap();
 
@@ -110,101 +153,94 @@ fn main() {
     let mut angle2 = 0.0;
 
     while let Some(e) = window.next() {
-        window.draw_2d(&e, |c:Context, g| {
-            clear([0.0, 0.0, 0.0, 0.0], g);
 
-//            let ds_bg = DrawState::new_alpha();
+        if let Event::Loop(Loop::Render(RenderArgs{ext_dt,..})) = e {
+            window.draw_2d(&e, |c:Context, g| {
+
+                clear([0.0, 0.0, 0.0, 0.0], g);
+
+                let transform = c.transform.trans(3.0, 3.0);
+
+                let mat: Matrix2d = rotate_radians(angle);
+
+                let pos: Vec2d = transform_vec(mat, base);//base;
+
+
+                let mut ds_clip = DrawState::new_clip();
+                ds_clip.stencil = Some(Stencil::Clip(254));
+
+
+                let c1_tf = transform.trans(origin[0], origin[1]).trans(pos[0], pos[1]);
+
+                Ellipse::new([1.0, 0.0, 0.0, 1.0])
+                    .draw(base_c1,
+                          &ds_c1,
+                          c1_tf, g);
+
+
+                let fx: Vec2d = vec2_normalized(pos);
+                let a = if f { (dot(fx, [1.0, 0.0]) as f64).acos() } else { (dot(fx, [-1.0, 0.0]) as f64).acos() };
+
+                if PI - a < 0.1 { f = !f; }
+
+                let l1_tf = transform.trans(origin[0], origin[1]).rot_rad(angle);
+
+                Image::new().rect(base_logo).draw(&rust_logo,
+                                                  &ds_l1,
+                                                  l1_tf, g);
+
+                //println!("{:?} ",a);
+
+                let c2_tf = transform.trans(origin[0], origin[1])
+                    .trans(pos[0], pos[1])
+                    .rot_rad(a)
+                    .scale(scale_x, 1.0);
+
+//            draw Debug
+//                Line::new([1.0, 0.0, 0.0, 1.0], 1.0)
+//                    .draw([0.0, 0.0, 100.0, 0.0],
+//                          &(c.draw_state),
+//                          transform.trans(origin[0], origin[1]).rot_rad(if f {a}else{PI + a} ), g);
 //
-//            Rectangle::new([0.0,0.0,0.0,0.0])
-//                .draw([0.0,0.0,150.0,150.0],&ds_bg,c.transform,g);
+//                Line::new([1.0, 0.0, 0.0, 1.0], 1.0)
+//                    .draw([0.0, 0.0, 100.0, 0.0] ,
+//                          &(c.draw_state),
+//                          transform.trans(origin[0], origin[1]), g);
 
-            let transform = c.transform.trans(3.0, 3.0);
-
-            let mat:Matrix2d = rotate_radians(angle);
-
-
-            let pos:Vec2d =  transform_vec(mat,base);//base;
-
-
-
-            let mut ds_clip = DrawState::new_clip();
-            ds_clip.stencil = Some(Stencil::Clip(254));
+                Ellipse::new([1.0, 0.0, 0.0, 1.0])
+                    .draw(base_c2,
+                          //&(c.draw_state),
+                          &ds_c2,
+                          c2_tf, g);
 
 
+                let l2_tf = transform.trans(origin[0], origin[1]).rot_rad(angle2);
 
-            let c1_tf =  transform.trans(origin[0],origin[1]).trans(pos[0],pos[1]);
+                Image::new().rect(base_logo).draw(&rust_logo,
+                                                  &ds_l2,
+                                                  l2_tf, g);
 
-            Ellipse::new([1.0, 0.0, 0.0, 1.0])
-                .draw(base_c1,
-                      &ds_c1,
-                      c1_tf, g);
+                // if angle >= PI2 { angle = 0.0; }else{ angle += 0.1; }
 
+                if scale_x_dir > 0 && cur_i2 >= tween_vec.len() - 1 {
+                    scale_x_dir = -1;
+                }
 
+                if scale_x_dir < 0 && cur_i2 == 0 {
+                    scale_x_dir = 1;
+                }
 
-            let fx:Vec2d= vec2_normalized(pos);
-            let a = if f { (dot(fx,[1.0,0.0]) as f64).acos() } else { (dot(fx,[-1.0,0.0]) as f64).acos() };
+                cur_i2 += (scale_x_dir * 1) as usize;
+                scale_x = tween_vec[cur_i2].y;
 
-            if PI - a < 0.1 { f = !f; }
+                if cur_i >= tween_vec.len() { cur_i = 0; }
 
-            let l1_tf = transform.trans(origin[0],origin[1]).rot_rad(angle);
+                angle = PI * 2.0 * tween_vec[cur_i].y;
+                angle2 = PI * 2.0 * tween_vec[tween_vec.len() - 1 - cur_i].y;
 
-            Image::new().rect(base_logo).draw(&rust_logo,
-                                              &ds_l1 ,
-                                              l1_tf, g);
-
-
-            //println!("{:?} ",a);
-
-            let c2_tf =  transform.trans(origin[0],origin[1])
-                        .trans(pos[0],pos[1])
-                        .rot_rad(a)
-                        .scale(scale_x,1.0);
-
-
-//            Line::new([1.0, 0.0, 0.0, 1.0],1.0)
-//                .draw([0.0,0.0,100.0,0.0],
-//                    &(c.draw_state),
-//                      transform.trans(origin[0],origin[1]).rot_rad(a),g);
-//
-//            Line::new([1.0, 0.0, 0.0, 1.0],1.0)
-//                .draw([0.0,0.0,100.0,0.0],
-//                      &(c.draw_state),
-//                      transform.trans(origin[0],origin[1]),g);
-
-            Ellipse::new([1.0, 0.0, 0.0, 1.0])
-                .draw(base_c2,
-                      //&(c.draw_state),
-                      &ds_c2,
-                      c2_tf, g);
-
-
-
-            let l2_tf = transform.trans(origin[0],origin[1]).rot_rad(angle2);
-
-            Image::new().rect(base_logo).draw(&rust_logo,
-                              &ds_l2 ,
-                              l2_tf, g);
-
-           // if angle >= PI2 { angle = 0.0; }else{ angle += 0.1; }
-
-            if scale_x_dir > 0 && cur_i2 >= tween_vec.len() - 1{
-                scale_x_dir = -1;
-            }
-
-            if scale_x_dir < 0 && cur_i2 == 0{
-                scale_x_dir = 1;
-            }
-
-            cur_i2 += (scale_x_dir * 1) as usize;
-            scale_x = tween_vec[cur_i2].y;
-
-            if cur_i >= tween_vec.len() { cur_i = 0; }
-
-            angle =  PI * 2.0 * tween_vec[cur_i].y;
-            angle2 =  PI * 2.0 * tween_vec[tween_vec.len() - 1 - cur_i].y;
-
-            cur_i += 1;
-        });
+                cur_i += 1;
+            });
+        }
 
         if let Event::Input(Input::Move(Motion::MouseCursor(x,y))) = e {
 
@@ -221,6 +257,7 @@ fn main() {
             last_cursor_pos[0] = x;
             last_cursor_pos[1] = y;
         }
+
 
         if let Event::Input(Input::Button(ButtonArgs{button,state,..})) = e{
             if let Button::Mouse(MouseButton::Left) = button{
