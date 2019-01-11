@@ -7,7 +7,7 @@ use piston_window::draw_state::Blend;
 use piston_window::*;
 use piston_window::{ Position,Texture,Flip,PistonWindow,Transformed,AdvancedWindow,Event,TextureSettings,ImageSize,RenderArgs};
 use piston_window::math::{ Matrix2d,Vec2d,rotate_radians,translate,transform_vec,add,sub,cast,dot};
-use std::f64::consts::PI;
+use std::f64::consts::{ PI};
 use glutin_window::GlutinWindow;
 use glutin_window::WindowSettings;
 
@@ -23,7 +23,7 @@ const W:u16 = 150u16;
 const H:u16 = 150u16;
 
 fn main() {
-    let default_ctrl_ps:Vec<f64> = vec![0.54,0.06,0.46,1.0];
+    let default_ctrl_ps:Vec<f64> = vec![0.0 ,0.0,1.0,1.0];
     let mut ctrl_ps = vec![];
 
     let mut ctrl_ps_handler= &default_ctrl_ps;
@@ -42,7 +42,6 @@ fn main() {
                         if it.as_bytes()[0] == b'.'{
                             s.insert_str(0,"0");
                         }
-                        println!("{}",s);
                         str::parse::<f64>(s.as_str()).ok()
                     }).collect();
                     let ptr = &ctrl_ps as *const _;
@@ -76,18 +75,25 @@ fn main() {
             curve.ctrl0,
             curve.ctrl1,
             curve.end ]);
+
+        let mut frame = 160usize;
+        let mut last_point:Point2d<f64> = Point2d::new(0.0,0.0);
+
         let mut res = vec![];
         for curve in curve_chain.iter() {
             let mut t = 0.0;
-            let zl = 1.0 / 60.0;
+            let zl = 1.0 / frame as f64;
 
-            for _i in 0..60{
-                res.push(curve.interp(t).unwrap());
+            for _i in 0..frame{
+                let temp = curve.interp(t).unwrap();
+                res.push(temp.y);
                 t += zl;
+
+                last_point = temp;
             }
         }
         let last = res.len() - 1;
-        res[last].y = 1.0;
+        res[last] = 1.0;
         res
     };
 
@@ -231,12 +237,12 @@ fn main() {
                 }
 
                 cur_i2 += (scale_x_dir * 1) as usize;
-                scale_x = tween_vec[cur_i2].y;
+                scale_x = 1.3 * tween_vec[cur_i2];
 
                 if cur_i >= tween_vec.len() { cur_i = 0; }
 
-                angle = PI * 2.0 * tween_vec[cur_i].y;
-                angle2 = PI * 2.0 * tween_vec[tween_vec.len() - 1 - cur_i].y;
+                angle = PI2 * tween_vec[cur_i];
+                angle2 = PI2 * tween_vec[tween_vec.len() - 1 - cur_i];
 
                 cur_i += 1;
             });
