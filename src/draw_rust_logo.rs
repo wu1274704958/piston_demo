@@ -77,7 +77,6 @@ fn main() {
             curve.end ]);
 
         let mut frame = 160usize;
-        let mut last_point:Point2d<f64> = Point2d::new(0.0,0.0);
 
         let mut res = vec![];
         for curve in curve_chain.iter() {
@@ -88,8 +87,6 @@ fn main() {
                 let temp = curve.interp(t).unwrap();
                 res.push(temp.y);
                 t += zl;
-
-                last_point = temp;
             }
         }
         let last = res.len() - 1;
