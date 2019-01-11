@@ -81,10 +81,10 @@ fn main() {
 
         let mut res = vec![];
         for curve in curve_chain.iter() {
-            let mut t = 0.0;
             let zl = 1.0 / frame as f64;
-
+            let mut t = zl;
             for _i in 0..frame{
+                if _i == frame - 1 { t = 0.9999999; }
                 let temp = curve.interp(t).unwrap();
                 res.push(temp.y);
                 t += zl;
