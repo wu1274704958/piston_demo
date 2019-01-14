@@ -1,378 +1,22 @@
-#![deny(missing_docs)]
-#![deny(missing_copy_implementations)]
-
-//! Window storage and interfacing traits.
-//!
-//! The [`Window`](./trait.Window.html) trait is the minimum interface required for event loop.
-//! All backends usually support this trait.
-//!
-//! The [`AdvancedWindow`](./trait.AdvancedWindow.html) trait
-//! is the maximum interface that can be provided,
-//! while still staying consistent between backends. Not all backends implement
-//! `AdvancedWindow`; check your backend's documentation to see whether it implements
-//! this trait.
-//!
-//! The [`WindowSettings`](./struct.WindowSettings.html) structure is the preferred way of building
-//! new windows in Piston. It uses the `BuildFromWindowSettings` trait,
-//! which backends implement to handle window creation and setup.
-//!
-//! The [`OpenGLWindow`](./trait.OpenGLWindow.html) trait is used to provide low-level
-//! access to OpenGL through the abstract Piston API.
-//!
-//! The [`Size`](./struct.Size.html) structure is used throughout Piston to store window sizes.
-//! It implements some conversion traits for convenience.
-
-extern crate shader_version;
+extern crate glutin;
+extern crate gl;
 extern crate input;
+extern crate window;
+extern crate shader_version;
+extern crate piston_window;
 
-use std::convert::From;
-use std::time::Duration;
+use glutin::GlContext;
+
+use std::collections::VecDeque;
 use shader_version::OpenGL;
-use input::Input;
+use glutin::GlRequest;
+use piston_window::PistonWindow;
 
-pub use no_window::NoWindow;
 
-mod no_window;
-
-/// The type of an OpenGL function address.
-///
-/// Note: This is a raw pointer. It can be null!
-///
-/// See [`OpenGLWindow`](./trait.OpenGLWindow.html) for more information.
-pub type ProcAddress = *const ();
-
-/// Structure to store the window size.
-///
-/// The width and height are in *points*. On most computers, a point
-/// is 1:1 with a pixel. However, this is not universally true. For example,
-/// the Apple Retina Display defines 1 point to be a 2x2 square of pixels.
-///
-/// Normally, the consideration of points vs pixels should be left to the
-/// host operating system.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Size {
-    /// The width.
-    pub width: f64,
-    /// The height.
-    pub height: f64,
-}
-
-impl From<[u32; 2]> for Size {
-    #[inline(always)]
-    fn from(value: [u32; 2]) -> Size {
-        Size {
-            width: value[0] as f64,
-            height: value[1] as f64,
-        }
-    }
-}
-
-impl From<[f64; 2]> for Size {
-    #[inline(always)]
-    fn from(value: [f64; 2]) -> Size {
-        Size {
-            width: value[0],
-            height: value[1],
-        }
-    }
-}
-
-impl From<(u32, u32)> for Size {
-    #[inline(always)]
-    fn from(value: (u32, u32)) -> Size {
-        Size {
-            width: value.0 as f64,
-            height: value.1 as f64,
-        }
-    }
-}
-
-impl From<(f64, f64)> for Size {
-    #[inline(always)]
-    fn from(value: (f64, f64)) -> Size {
-        Size {
-            width: value.0,
-            height: value.1,
-        }
-    }
-}
-
-impl From<Size> for [u32; 2] {
-    #[inline(always)]
-    fn from(value: Size) -> [u32; 2] {
-        [value.width as u32, value.height as u32]
-    }
-}
-
-impl From<Size> for [f64; 2] {
-    #[inline(always)]
-    fn from(value: Size) -> [f64; 2] {
-        [value.width, value.height]
-    }
-}
-
-impl From<Size> for (u32, u32) {
-    #[inline(always)]
-    fn from(value: Size) -> (u32, u32) {
-        (value.width as u32, value.height as u32)
-    }
-}
-
-impl From<Size> for (f64, f64) {
-    #[inline(always)]
-    fn from(value: Size) -> (f64, f64) {
-        (value.width, value.height)
-    }
-}
-
-/// Structure to store the window position.
-///
-/// The width and height are in *points*. On most computers, a point
-/// is 1:1 with a pixel. However, this is not universally true. For example,
-/// the Apple Retina Display defines 1 point to be a 2x2 square of pixels.
-///
-/// Normally, the consideration of points vs pixels should be left to the
-/// host operating system.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Position {
-    /// The x coordinate.
-    pub x: i32,
-    /// The y coordinate.
-    pub y: i32,
-}
-
-impl From<[i32; 2]> for Position {
-    #[inline(always)]
-    fn from(value: [i32; 2]) -> Position {
-        Position {
-            x: value[0],
-            y: value[1],
-        }
-    }
-}
-
-impl From<(i32, i32)> for Position {
-    #[inline(always)]
-    fn from(value: (i32, i32)) -> Position {
-        Position {
-            x: value.0,
-            y: value.1,
-        }
-    }
-}
-
-impl From<Position> for [i32; 2] {
-    #[inline(always)]
-    fn from(value: Position) -> [i32; 2] {
-        [value.x, value.y]
-    }
-}
-
-impl From<Position> for (i32, i32) {
-    #[inline(always)]
-    fn from(value: Position) -> (i32, i32) {
-        (value.x, value.y)
-    }
-}
-
-/// Constructs a window from a [`WindowSettings`](./struct.WindowSettings.html)
-/// object.
-///
-/// It is used by [`WindowSettings::build`](./struct.WindowSettings.html#method.build).
-/// Note that the backend's implementation of this may differ from its implementation
-/// of `::new()`.
-pub trait BuildFromWindowSettings: Sized {
-    /// Builds the window from a `WindowSettings` object.
-    ///
-    /// # Errors
-    ///
-    /// See your backend's documentation for details about what kind of
-    /// error strings can be returned, and the conditions for error.
-    fn build_from_window_settings(settings: &WindowSettings) -> Result<Self, String>;
-}
-
-/// Trait representing the minimum requirements for defining a window.
-///
-/// This trait defines all the behavior needed for making an event loop.
-///
-/// An example of a working event loop can be found in the Piston-Tutorials
-/// repository under getting-started, or in the event loop examples.
-pub trait Window {
-    /// Tells the window to close or stay open.
-    fn set_should_close(&mut self, value: bool);
-
-    /// Returns true if the window should close.
-    fn should_close(&self) -> bool;
-
-    /// Gets the size of the window.
-    fn size(&self) -> Size;
-
-    /// Swaps render buffers.
-    ///
-    /// When this is set to false, this method must be called manually
-    /// or through the window backend. By default it is set to true, so
-    /// usually it is not needed in application code.
-    fn swap_buffers(&mut self);
-
-    /// Wait indefinitely for an input event to be available from the window.
-    fn wait_event(&mut self) -> Input;
-
-    /// Wait for an input event to be available from the window or for the
-    /// specified timeout to be reached.
-    ///
-    /// Returns `None` only if there is no input event within the timeout.
-    fn wait_event_timeout(&mut self, timeout: Duration) -> Option<Input>;
-
-    /// Polls an input event from the window.
-    ///
-    /// Return `None` if no events available.
-    fn poll_event(&mut self) -> Option<Input>;
-
-    /// Gets the draw size of the window.
-    ///
-    /// This is equal to the size of the frame buffer of the inner window,
-    /// excluding the title bar and borders.
-    ///
-    /// This information is given to the client code through the
-    /// [`Render`](../input/enum.Event.html) event.
-    fn draw_size(&self) -> Size;
-}
-
-/// Trait representing a window with the most features that are still generic.
-///
-/// This trait is implemented by fully featured window back-ends. When possible,
-/// reduce the trait constraint to `Window` to make the code more portable.
-///
-/// The `Sized` trait is required for method chaining.
-pub trait AdvancedWindow: Window + Sized {
-    /// Gets a copy of the title of the window.
-    fn get_title(&self) -> String;
-
-    /// Sets the title of the window.
-    fn set_title(&mut self, value: String);
-
-    /// Sets title on window.
-    ///
-    /// This method moves the current window data,
-    /// unlike [`set_title()`](#tymethod.set_title), so
-    /// that it can be used in method chaining.
-    fn title(mut self, value: String) -> Self {
-        self.set_title(value);
-        self
-    }
-
-    /// Gets whether to exit when pressing esc.
-    ///
-    /// Useful when prototyping.
-    fn get_exit_on_esc(&self) -> bool;
-
-    /// Sets whether to exit when pressing esc.
-    ///
-    /// Useful when prototyping.
-    fn set_exit_on_esc(&mut self, value: bool);
-
-    /// Sets whether to exit when pressing the Esc button.
-    ///
-    /// Useful when prototyping.
-    ///
-    /// This method moves the current window data,
-    /// unlike [`set_exit_on_esc()`](#tymethod.set_exit_on_esc), so
-    /// that it can be used in method chaining.
-    fn exit_on_esc(mut self, value: bool) -> Self {
-        self.set_exit_on_esc(value);
-        self
-    }
-
-    /// Sets whether to capture/grab the cursor.
-    ///
-    /// This is used to lock and hide cursor to the window,
-    /// for example in a first-person shooter game.
-    fn set_capture_cursor(&mut self, value: bool);
-
-    /// Sets whether to capture/grab the cursor.
-    ///
-    /// This method moves the current window data,
-    /// unlike [`set_capture_cursor()`](#tymethod.set_capture_cursor), so
-    /// that it can be used in method chaining.
-    fn capture_cursor(mut self, value: bool) -> Self {
-        self.set_capture_cursor(value);
-        self
-    }
-
-    /// Shows the window.
-    ///
-    /// If the platform does not support this, it will have no effect.
-    fn show(&mut self);
-
-    /// Hides the window.
-    ///
-    /// If the platform does not support this, it will have no effect.
-    fn hide(&mut self);
-
-    /// Gets the position of window.
-    ///
-    // Returns `None` if the window no longer has a position.
-    fn get_position(&self) -> Option<Position>;
-
-    /// Sets the position of window.
-    ///
-    /// Has no effect if the window no longer has a position.
-    fn set_position<P: Into<Position>>(&mut self, val: P);
-
-    /// Sets the window size.
-    ///
-    /// Has no effect if the window no longer has a size.
-    fn set_size<S: Into<Size>>(&mut self, val: S);
-
-    /// Sets the position of window.
-    ///
-    /// Has no effect if the window no longer has a position.
-    ///
-    /// This method moves the current window data,
-    /// unlike [`set_position()`](#tymethod.set_position), so
-    /// that it can be used in method chaining.
-    fn position<P: Into<Position>>(mut self, val: P) -> Self {
-        self.set_position(val);
-        self
-    }
-}
-
-/// Trait for OpenGL specific operations on a window.
-///
-/// OpenGL uses a strategy called "function pointer loading"
-/// to hook up the higher level graphics APIs with the OpenGL
-/// driver. Which function pointers to load depends on the
-/// hardware capabilities and version of OpenGL. By using the
-/// [`OpenGLWindow`](trait.OpenGLWindow.html)
-/// trait, the higher level graphics API can load
-/// functions from the window backend with the version set up
-/// using the `WindowSettings` structure.
-///
-/// For more information about function pointer loading, see
-/// https://www.opengl.org/wiki/Load_OpenGL_Functions
-pub trait OpenGLWindow: Window {
-    /// Returns the address of the specified OpenGL function if it exists.
-    ///
-    /// If the function does not exist, it returns a null pointer.
-    fn get_proc_address(&mut self, proc_name: &str) -> ProcAddress;
-
-    /// Returns true if this window's gl context is the current gl context.
-    fn is_current(&self) -> bool;
-
-    /// Make the window's gl context the current gl context.
-    fn make_current(&mut self);
-}
-
-/// Settings structure for window behavior.
-///
-/// This structure stores everything that needs to be customized when
-/// constructing most windows. This structure makes it easy to create multiple
-/// windows with the same settings, and it also makes piston's multiple backends
-/// easier to implement for piston devs.
 #[derive(Clone)]
 pub struct WindowSettings {
     title: String,
-    size: Size,
+    size: (u32,u32),
     samples: u8,
     fullscreen: bool,
     exit_on_esc: bool,
@@ -397,7 +41,7 @@ impl WindowSettings {
     /// - resizable: true
     /// - decorated: true
     /// - controllers: true
-    pub fn new<T: Into<String>, S: Into<Size>>(title: T, size: S) -> WindowSettings {
+    pub fn new<T: Into<String>>(title: T, size: (u32,u32)) -> WindowSettings {
         WindowSettings {
             title: title.into(),
             size: size.into(),
@@ -415,19 +59,8 @@ impl WindowSettings {
         }
     }
 
-    /// Builds window from the given settings.
-    ///
-    /// The return value is ambiguous, to allow for operation on multiple
-    /// backends. Clients should explicitly name the return type. See the
-    /// Guide to using Piston Windows for more info and examples.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if your backend returns an error.
-    /// See your backend's documentation on `build_from_window_settings()`
-    /// for more details.
-    pub fn build<W: BuildFromWindowSettings>(&self) -> Result<W, String> {
-        BuildFromWindowSettings::build_from_window_settings(self)
+    pub fn build(&self) ->  Result< PistonWindow<glutin_window::GlutinWindow>,String> {
+        create_window(self)
     }
 
     /// Gets the title of built windows.
@@ -451,12 +84,12 @@ impl WindowSettings {
     }
 
     /// Gets the size of built windows.
-    pub fn get_size(&self) -> Size {
+    pub fn get_size(&self) -> (u32,u32) {
         self.size
     }
 
     /// Sets the size of built windows.
-    pub fn set_size(&mut self, value: Size) {
+    pub fn set_size(&mut self, value: (u32,u32)) {
         self.size = value;
     }
 
@@ -465,7 +98,7 @@ impl WindowSettings {
     /// This method moves the current window data,
     /// unlike [`set_size()`](#method.set_size),
     /// so that it can be used in method chaining.
-    pub fn size(mut self, value: Size) -> Self {
+    pub fn size(mut self, value: (u32,u32)) -> Self {
         self.set_size(value);
         self
     }
@@ -776,4 +409,145 @@ impl WindowSettings {
         self.set_always_on_top(value);
         self
     }
+}
+
+
+fn window_builder_from_settings(settings: &WindowSettings) -> glutin::WindowBuilder {
+    let size = settings.get_size();
+    let transparent = settings.get_transparent();
+    let mut builder = glutin::WindowBuilder::new()
+        .with_dimensions((size.0, size.1).into())
+        .with_decorations(settings.get_decorated())
+        .with_multitouch()
+        .with_title(settings.get_title())
+        .with_resizable(settings.get_resizable())
+        .with_transparency(transparent)
+        .with_always_on_top(settings.get_always_on_top());
+
+    if settings.get_fullscreen() {
+        let events_loop = glutin::EventsLoop::new();
+        builder = builder.with_fullscreen(Some(events_loop.get_primary_monitor()));
+    }
+    builder
+}
+
+
+fn context_builder_from_settings(settings: &WindowSettings) -> glutin::ContextBuilder {
+    let opengl = settings.get_maybe_opengl().unwrap_or(OpenGL::V3_2);
+    let (major, minor) = opengl.get_major_minor();
+    let mut builder = glutin::ContextBuilder::new()
+        .with_gl(GlRequest::GlThenGles {
+            opengl_version: (major as u8, minor as u8),
+            opengles_version: (major as u8, minor as u8),
+        })
+        .with_srgb(settings.get_srgb());
+    let samples = settings.get_samples();
+    if settings.get_vsync() {
+        builder = builder.with_vsync(true);
+    }
+    if samples != 0 {
+        builder = builder.with_multisampling(samples as u16);
+    }
+    builder}
+
+
+use std::mem::{forget,transmute};
+use std::ptr::swap;
+
+
+pub struct GlutinWindow {
+    /// The window.
+    pub window: glutin::GlWindow,
+    // The back-end does not remember the title.
+    title: String,
+    exit_on_esc: bool,
+    should_close: bool,
+    // Used to fake capturing of cursor,
+    // to get relative mouse events.
+    is_capturing_cursor: bool,
+    // Stores the last known cursor position.
+    last_cursor_pos: Option<[f64; 2]>,
+    // Stores relative coordinates to emit on next poll.
+    mouse_relative: Option<(f64, f64)>,
+    // Used to emit cursor event after enter/leave.
+    cursor_pos: Option<[f64; 2]>,
+    // Polls events from window.
+    events_loop: glutin::EventsLoop,
+    // Stores list of events ready for processing.
+    events: VecDeque<glutin::Event>,
+}
+
+fn create_glutin_window(settings: &WindowSettings) -> Result<glutin_window::GlutinWindow,String>
+{
+    use std::error::Error;
+    use glutin::ContextError;
+    let events_loop = glutin::EventsLoop::new();
+    let title = settings.get_title();
+    let exit_on_esc = settings.get_exit_on_esc();
+    let window = glutin::GlWindow::new(
+        window_builder_from_settings(&settings),
+        context_builder_from_settings(&settings),
+        &events_loop
+    );
+    let window = match window {
+        Ok(window) => window,
+        Err(_) => {
+            glutin::GlWindow::new(
+                window_builder_from_settings(&settings),
+                context_builder_from_settings(&settings.clone().samples(0)),
+                &events_loop
+            ).map_err(|e| format!("{}", e))?
+        }
+    };
+    unsafe {
+        window.make_current().map_err(|e|
+            // This can be simplified in next version of Glutin.
+            match e {
+                ContextError::OsError(err) => {
+                    err
+                }
+                ContextError::IoError(ref err) => {
+                    String::from(err.description())
+                }
+                ContextError::ContextLost => {
+                    String::from("Context lost")
+                }
+            }
+        )?;
+    }
+    // Load the OpenGL function pointers.
+    gl::load_with(|s| window.get_proc_address(s) as *const _);
+
+    let window:glutin_window::GlutinWindow = unsafe {
+        let w :GlutinWindow = GlutinWindow {
+            window,
+            title,
+            exit_on_esc,
+            should_close: false,
+            cursor_pos: None,
+            is_capturing_cursor: false,
+            last_cursor_pos: None,
+            mouse_relative: None,
+            events_loop,
+            events: VecDeque::new(),
+        };
+
+        transmute(w)
+    };
+
+    Ok(window)
+}
+
+pub fn create_window(settings: &WindowSettings) -> Result< PistonWindow<glutin_window::GlutinWindow>,String>
+{
+    let glutin_window = create_glutin_window(settings);
+
+    let settings = settings.clone().srgb(true);
+
+    // Use OpenGL 3.2 by default, because this is what window backends
+    // usually do.
+    let opengl = settings.get_maybe_opengl().unwrap_or(OpenGL::V3_2);
+    let samples = settings.get_samples();
+
+    Ok(PistonWindow::new(opengl, samples, glutin_window?))
 }

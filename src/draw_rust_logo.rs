@@ -2,6 +2,7 @@ extern crate piston_window;
 extern crate find_folder;
 extern crate vecmath;
 extern crate glutin_window;
+extern crate piston_demo;
 
 use piston_window::draw_state::Blend;
 use piston_window::*;
@@ -9,15 +10,12 @@ use piston_window::{ Position,Texture,Flip,PistonWindow,Transformed,AdvancedWind
 use piston_window::math::{ Matrix2d,Vec2d,rotate_radians,translate,transform_vec,add,sub,cast,dot};
 use std::f64::consts::{ PI};
 use glutin_window::GlutinWindow;
-use glutin_window::WindowSettings;
 
 use nbez::{BezChain,Point2d,Bez3o,BezCurve};
 use piston_window::draw_state::Stencil;
 use vecmath::vec2_normalized;
-use glutin::{ Window};
-use glutin::dpi::LogicalPosition;
 use std::env::args;
-
+use piston_demo::TransparentWindow::{WindowSettings,create_window };
 
 const W:u16 = 150u16;
 const H:u16 = 150u16;
@@ -76,7 +74,7 @@ fn main() {
             curve.ctrl1,
             curve.end ]);
 
-        let mut frame = 160usize;
+        let mut frame = 60usize;
 
         let mut res = vec![];
         for curve in curve_chain.iter() {
@@ -96,7 +94,7 @@ fn main() {
 
     let mut window: PistonWindow<GlutinWindow> = WindowSettings::new(
         "piston: draw_state",
-        [W as f64,H as f64]
+        (W as u32,H as u32)
     )
         .exit_on_esc(true)
         .samples(32)
@@ -147,7 +145,7 @@ fn main() {
     let mut mouse_button_down = false;
     let mut last_cursor_pos:Vec2d = [0.0,0.0];
     let mut begin_cursor_pos:Vec2d = [W as f64,H as f64];
-    let mut now = LogicalPosition::new(0.0,0.0);
+    let mut now = Position{x:0,y:0};
     let mut lose_focus = false;
 
     let PI2 = PI * 2.0;
@@ -249,12 +247,11 @@ fn main() {
 
             if mouse_button_down {
                 let offset = sub([x,y],begin_cursor_pos);
-                let w:&glutin::GlWindow = &(window.window.window);
                 if offset[0].abs() >= 5.0 || offset[1].abs() >= 5.0
                 {
                     //println!("{:?}, {:?} {:?}",now,offset,begin_cursor_pos);
-                    now = w.get_position().unwrap();
-                    w.set_position(LogicalPosition::new(now.x + offset[0],now.y + offset[1]));
+                    now = window.get_position().unwrap();
+                    window.set_position(Position{x:now.x + offset[0] as i32, y: now.y + offset[1] as i32});
                 }
             }
             last_cursor_pos[0] = x;
@@ -286,3 +283,5 @@ fn main() {
         }
     }
 }
+
+
