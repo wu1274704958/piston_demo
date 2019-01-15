@@ -3,6 +3,7 @@ extern crate find_folder;
 extern crate vecmath;
 extern crate glutin_window;
 extern crate piston_demo;
+extern crate test_beizer;
 
 use piston_window::draw_state::Blend;
 use piston_window::*;
@@ -11,11 +12,11 @@ use piston_window::math::{ Matrix2d,Vec2d,rotate_radians,translate,transform_vec
 use std::f64::consts::{ PI};
 use glutin_window::GlutinWindow;
 
-use nbez::{BezChain,Point2d,Bez3o,BezCurve};
 use piston_window::draw_state::Stencil;
 use vecmath::vec2_normalized;
 use std::env::args;
-use piston_demo::TransparentWindow::{WindowSettings,create_window };
+use piston_demo::TransparentWindow::{WindowSettings };
+use test_beizer::{ UnitBezier , division };
 
 const W:u16 = 150u16;
 const H:u16 = 150u16;
@@ -62,30 +63,19 @@ fn main() {
     }
 
     let tween_vec = {
-        let curve: Bez3o<f64> = Bez3o::new(
-            Point2d::new(0.0    ,0.0),
-            Point2d::new(ctrl_ps_handler[0]   , ctrl_ps_handler[1]),
-            Point2d::new(ctrl_ps_handler[2]   , ctrl_ps_handler[3]),
-            Point2d::new(1.0    ,1.0)
-        );
-        let curve_chain: BezChain<f64, Bez3o<f64>, Vec<Point2d<f64>>> = BezChain::from_container(vec![
-            curve.start,
-            curve.ctrl0,
-            curve.ctrl1,
-            curve.end ]);
+       let b = UnitBezier::new( ctrl_ps_handler[0]   , ctrl_ps_handler[1],
+                                            ctrl_ps_handler[2]   , ctrl_ps_handler[3]);
 
         let mut frame = 60usize;
 
         let mut res = vec![];
-        for curve in curve_chain.iter() {
-            let zl = 1.0 / frame as f64;
-            let mut t = zl;
-            for _i in 0..frame{
-                if _i == frame - 1 { t = 0.9999999; }
-                let temp = curve.interp(t).unwrap();
-                res.push(temp.y);
-                t += zl;
-            }
+
+        let zl = 1.0 / frame as f64;
+        let mut t = 0.0;
+        for _i in 0..frame{
+            let y = b.solve(division(t,0.0,1.0,0.0001,|t_| { b.sample_curve_x(t_) } ));
+            res.push(y);
+            t += zl;
         }
         let last = res.len() - 1;
         res[last] = 1.0;
@@ -182,7 +172,7 @@ fn main() {
                 let fx: Vec2d = vec2_normalized(pos);
                 let a = if f { (dot(fx, [1.0, 0.0]) as f64).acos() } else { (dot(fx, [-1.0, 0.0]) as f64).acos() };
 
-                if PI - a < 0.1 { f = !f; }
+                //if PI - a < 0.01 { f = !f; }
 
                 let l1_tf = transform.trans(origin[0], origin[1]).rot_rad(angle);
 
@@ -197,7 +187,7 @@ fn main() {
                     .rot_rad(a)
                     .scale(scale_x, 1.0);
 
-//            draw Debug
+            //draw Debug
 //                Line::new([1.0, 0.0, 0.0, 1.0], 1.0)
 //                    .draw([0.0, 0.0, 100.0, 0.0],
 //                          &(c.draw_state),
@@ -207,7 +197,7 @@ fn main() {
 //                    .draw([0.0, 0.0, 100.0, 0.0] ,
 //                          &(c.draw_state),
 //                          transform.trans(origin[0], origin[1]), g);
-
+//
                 Ellipse::new([1.0, 0.0, 0.0, 1.0])
                     .draw(base_c2,
                           //&(c.draw_state),
@@ -232,7 +222,7 @@ fn main() {
                 }
 
                 cur_i2 += (scale_x_dir * 1) as usize;
-                scale_x = 1.3 * tween_vec[cur_i2];
+                scale_x = 1.0 * tween_vec[cur_i2];
 
                 if cur_i >= tween_vec.len() { cur_i = 0; }
 

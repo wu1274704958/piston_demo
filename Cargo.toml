@@ -48,3 +48,5 @@ version = "0.34.0"
 [dependencies.shader_version]
 version = "0.3.0"
 
+[dependencies.test_beizer]
+path = "./test_beizer"

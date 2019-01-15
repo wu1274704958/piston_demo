@@ -1,0 +1,13 @@
+[package]
+name = "test_beizer"
+version = "0.1.0"
+authors = ["wusj7856 <wusj@realbull.net>"]
+edition = "2018"
+
+[lib]
+name = "test_beizer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "test"
+path = "src/test.rs"
