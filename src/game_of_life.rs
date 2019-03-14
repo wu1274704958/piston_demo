@@ -6,8 +6,8 @@ use piston_window::*;
 use glutin_window::GlutinWindow;
 use piston_demo::TransparentWindow::WindowSettings;
 
-const WORLD_W: u32 = 160;
-const WORLD_H: u32 = 160;
+const WORLD_W: u32 = 360;
+const WORLD_H: u32 = 260;
 
 const CELL_W: u32 = 2;
 
@@ -103,6 +103,7 @@ fn main() {
             if let Button::Mouse(MouseButton::Right) = button {
                 match state {
                     ButtonState::Press => {
+                        last_mouse_pos = (0.0,0.0);
                         rbd = true;
                     }
                     ButtonState::Release => {
