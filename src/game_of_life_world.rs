@@ -1,5 +1,6 @@
 use std::iter::Iterator;
 use std::ptr::copy;
+use rand::{thread_rng, Rng};
 
 #[derive(Copy, Clone,PartialEq)]
 pub enum CellState{
@@ -47,7 +48,7 @@ pub struct World{
     cell_states: Vec<CellState>,
     back_cell_states : Vec<CellState>
 }
-
+#[allow(dead_code)]
 impl World{
     pub fn new(width:u32,height :u32) -> World
     {
@@ -167,5 +168,16 @@ impl World{
         let dst = &mut (self.back_cell_states[0]) as *mut CellState;
         let src = &(self.cell_states[0]) as *const CellState;
         unsafe{ copy(src,dst,size) };
+    }
+
+    pub fn random_set(&mut self,n:u32,cs:CellState)
+    {
+        let mut rng = thread_rng();
+
+        for _ in 0..n {
+            let x = rng.gen_range(0, self.width);
+            let y = rng.gen_range(0, self.height);
+            self.set_cell(x,y,cs);
+        }
     }
 }

@@ -23,6 +23,7 @@ path = "src/game_of_life.rs"
 [dependencies]
 piston_window = { version = "0.85.0",features = ["glutin"] }
 find_folder = "0.3.0"
+rand = "0.6.5"
 
 [dependencies.pistoncore-glutin_window]
 version = "0.51.1"

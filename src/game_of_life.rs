@@ -5,21 +5,32 @@ extern crate piston_demo;
 use piston_window::*;
 use glutin_window::GlutinWindow;
 use piston_demo::TransparentWindow::WindowSettings;
+use piston_window::rectangle::Shape;
 
 const WORLD_W: u32 = 360;
 const WORLD_H: u32 = 260;
 
 const CELL_W: u32 = 2;
 
-const fn CELL_W_1_2() -> u32
+const fn cell_w_1_2() -> u32
 {
     CELL_W  / 2
 }
 
-fn RECT_MODEL() -> [f64;4]
+const fn rect_model() -> [f64;4]
 {
-    let w_1_2 = CELL_W_1_2() as f64;
-    [-w_1_2,-w_1_2,CELL_W as f64,CELL_W as f64]
+    let w_1_2 = cell_w_1_2() as i32;
+    [-w_1_2 as f64,-w_1_2 as f64,CELL_W as f64,CELL_W as f64]
+}
+
+const fn window_w() -> u32
+{
+    WORLD_W * CELL_W
+}
+
+const fn window_h() -> u32
+{
+    WORLD_H * CELL_W
 }
 
 mod game_of_life_world;
@@ -29,10 +40,10 @@ use game_of_life_world::{World,CellState};
 fn main() {
     let mut window: PistonWindow<GlutinWindow> = WindowSettings::new(
         "game of life",
-        (WORLD_W * CELL_W, WORLD_H * CELL_W),
+        (window_w(), window_h()),
     )
         .exit_on_esc(true)
-        .samples(32)
+        .samples(1)
         .vsync(true)
         .decorated(false)
         .resizable(false)
@@ -49,9 +60,13 @@ fn main() {
     world.set_alive(2,1);
 
     while let Some(e) = window.next() {
-        if let Event::Loop(Loop::Render(RenderArgs { ext_dt, .. })) = e {
+        if let Event::Loop(Loop::Render(RenderArgs { .. })) = e {
             window.draw_2d(&e, |c: Context, g| {
-                clear([0.0, 0.0, 0.0, 0.5], g);
+                clear([0.0, 0.0, 0.0, 0.0], g);
+
+                let mut bg = Rectangle::new([0.0, 0.0, 0.0, 0.5]);
+                bg.shape = Shape::Round(20.0,10);
+                bg.draw([0.0,0.0, window_w() as f64, window_h() as f64 ], &c.draw_state, c.transform, g);
 
                 for y in 0..WORLD_H{
                     for x in 0..WORLD_W {
@@ -111,6 +126,15 @@ fn main() {
                     }
                 }
             }
+
+            if let Button::Keyboard(key) = button{
+                if let ButtonState::Release = state {
+                    match key {
+                        Key::Space => {  world.random_set(200,CellState::Alive);  },
+                        _ => {}
+                    }
+                }
+            }
         }
     }
 }
@@ -122,8 +146,8 @@ fn get_cell_pos(x:f64,y:f64) -> (u32,u32)
 
 fn draw_cell(x:u32,y:u32,g:&mut G2d,c:Context)
 {
-    let trans = c.transform.trans((x * CELL_W + CELL_W_1_2()) as _ , (y * CELL_W + CELL_W_1_2()) as _);
+    let trans = c.transform.trans((x * CELL_W + cell_w_1_2()) as _, (y * CELL_W + cell_w_1_2()) as _);
     Rectangle::new([1.0,1.0,1.0,1.0])
-        .draw(RECT_MODEL(),&(c.draw_state),trans,g);
+        .draw(rect_model(), &(c.draw_state), trans, g);
 }
 
