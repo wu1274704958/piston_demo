@@ -59,7 +59,7 @@ impl World{
             back_cell_states : vec![CellState::Dead;(width * height) as usize]
         }
     }
-
+    #[inline]
     pub fn get_cell(&self,x:u32,y:u32) -> CellState
     {
         self.cell_states[(y * self.width + x) as usize]
@@ -85,7 +85,7 @@ impl World{
         true
     }
 
-
+    #[inline]
     pub fn get_cell_back(&self,x:u32,y:u32) -> CellState
     {
         self.back_cell_states[(y * self.width + x) as usize]
@@ -110,7 +110,7 @@ impl World{
         self.set_cell_back(x,y,CellState::Dead);
         true
     }
-
+    #[inline]
     pub fn in_bound(&self,x:i32,y:i32) -> bool
     {
         if x >= self.width as i32 || y >= self.height as i32 || x < 0 || y < 0 { return false }else{ true }
@@ -143,10 +143,10 @@ impl World{
                 match count {
                     2 => { }    // 保持不變
                     3 => {      // 轉衛生
-                        if !self.set_alive_back(x,y){  dbg!((x,y));  }
+                        self.set_alive_back(x,y);
                     }
                     _ => {      // 轉為死
-                        if !self.set_dead_back(x,y){  dbg!((x,y));  }
+                        self.set_dead_back(x,y);
                     }
                 }
             }
