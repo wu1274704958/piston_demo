@@ -93,7 +93,7 @@ fn main() {
                     let offsetx = x - last_mouse_pos.0;
                     let offsety = y - last_mouse_pos.1;
 
-                    if offsetx.abs() > 5.0 || offsety.abs() > 5.0{
+                    if offsetx.abs() > 1.0 || offsety.abs() > 1.0{
                         let now = window.get_position().unwrap();
                         window.set_position(Position{x:now.x + offsetx as i32, y: now.y + offsety as i32});
                     }
